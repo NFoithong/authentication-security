@@ -1,4 +1,7 @@
 //jshint esversion:6
+
+// Storing configuration in the environment separate from code is based on The Twelve-Factor App methodology.
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
@@ -29,8 +32,8 @@ const userSchema = new mongoose.Schema({
 // Secret String Instead of Two Keys
 // For convenience, you can also pass in a single secret string instead of two keys.
 // Encrypt Only Certain Fields
-const secret = 'Thisisourlittlesecret.';
-userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
+// const secret = 'Thisisourlittlesecret.'; delete this line and save into .env file for hidden security
+userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] });
 
 const User = new mongoose.model('User', userSchema);
 
