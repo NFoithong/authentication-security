@@ -11,8 +11,13 @@ const mongoose = require('mongoose');
 // const md5 = require('md5'); js function for hashing messages with MD5
 
 // Bcrypt is a library to help you hash passwords. It uses a password-hashing function that is based on the Blowfish cipher.
-const bcrypt = require('bcrypt');
-const saltRound = 10;
+// const bcrypt = require('bcrypt');
+// const saltRound = 10;
+
+// using passport, session packages
+const session = require('express-session');
+const passport = require('passport');
+const passportLocalMongoose = require('passport-local-mongoose');
 
 const app = express();
 
@@ -29,10 +34,27 @@ mongoose.set("strictQuery", false);
 // connect to mongodb
 mongoose.connect('mongodb://localhost:27017/secrests', { useNewUrlParser: true });
 
+// if we run nodemon and there is a message the application warning that (node:35949) deprecationWarning: use the code below
+// mongoose.set('useCreateIndex', true);
+
+// Tell the app to use session here: checkout the documentation in npm.js how to implement the code
+app.use(session({
+    secret: "Our little secret.", // any long string which you can remember
+    resave: false,
+    saveUninitialized: true,
+}));
+
+// Tell the app to use passport initialize here: checkout on passportjs.org documentation
+app.use(passport.initialize());
+app.use(passport.session()); // use passport to dealing with the session
+
 const userSchema = new mongoose.Schema({
     email: String,
     password: String
 });
+
+// To use hash and salt the password to save on the mongoose DB 
+userSchema.plugin(passportLocalMongoose);
 
 // Secret String Instead of Two Keys
 // For convenience, you can also pass in a single secret string instead of two keys.
@@ -41,6 +63,12 @@ const userSchema = new mongoose.Schema({
 // userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] }); delete this line because we gonna use hashing function with md5
 
 const User = new mongoose.model('User', userSchema);
+
+// passport-local configuration: serializeUser and deserializeUser
+passport.use(User.createStrategy()); // passport to use login strategy
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 // home
 app.get('/', (req, res) => {
@@ -57,8 +85,30 @@ app.get('/register', (req, res) => {
     res.render('register');
 });
 
+// create a secrets route
+app.get("/secrets", function(req, res) {
+    if (req.isAuthenticated()) {
+        res.render("secrets");
+    } else {
+        res.redirect("/login");
+    }
+});
+
+// logout
+app.get("/logout", function(req, res) {
+    req.logout(function(err) {
+        if (err) {
+            console.log(err);
+        } else {
+            res.redirect("/");
+        }
+    });
+});
+
 // register post route 
 app.post('/register', (req, res) => {
+
+    /* This bcrypt is deleted because we gonna use passport, session
 
     // bcrypt hashing function for password
     bcrypt.hash(req.body.password, saltRound, function(err, hash) {
@@ -75,10 +125,24 @@ app.post('/register', (req, res) => {
             }
         });
     });
+    */
+
+    // go to npm.js passport-local-mongoose for documentation to user authentication
+    User.register({ username: req.body.username }, req.body.password, function(err, user) {
+        if (err) {
+            console.log(err);
+            res.redirect("/register");
+        } else {
+            passport.authenticate('local')(req, res, function() {
+                res.redirect("/secrets");
+            })
+        }
+    })
 });
 
 // login post route
 app.post('/login', (req, res) => {
+    /* This bcrypt is deleted because we gonna use passport, session
     const username = req.body.username;
     const password = req.body.password;
 
@@ -94,6 +158,23 @@ app.post('/login', (req, res) => {
                     }
                 });
             }
+        }
+    });
+    */
+
+    // checkout passportjs.org
+    const user = new User({
+        username: req.body.username,
+        password: req.body.password
+    });
+
+    req.login(user, function(err) {
+        if (err) {
+            console.log(err);
+        } else {
+            passport.authenticate("local")(req, res, function() {
+                res.redirect("/secrets");
+            })
         }
     });
 });
