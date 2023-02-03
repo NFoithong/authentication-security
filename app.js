@@ -7,7 +7,12 @@ const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
 // npm i mongoose-encryption : read the document in npmjs.com to use
-const encrypt = require('mongoose-encryption');
+// const encrypt = require('mongoose-encryption');
+// const md5 = require('md5'); js function for hashing messages with MD5
+
+// Bcrypt is a library to help you hash passwords. It uses a password-hashing function that is based on the Blowfish cipher.
+const bcrypt = require('bcrypt');
+const saltRound = 10;
 
 const app = express();
 
@@ -33,7 +38,7 @@ const userSchema = new mongoose.Schema({
 // For convenience, you can also pass in a single secret string instead of two keys.
 // Encrypt Only Certain Fields
 // const secret = 'Thisisourlittlesecret.'; delete this line and save into .env file for hidden security
-userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] });
+// userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: ['password'] }); delete this line because we gonna use hashing function with md5
 
 const User = new mongoose.model('User', userSchema);
 
@@ -54,17 +59,21 @@ app.get('/register', (req, res) => {
 
 // register post route 
 app.post('/register', (req, res) => {
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
-    });
 
-    newUser.save(function(err) {
-        if (err) {
-            console.log(err);
-        } else {
-            res.render('secrets');
-        }
+    // bcrypt hashing function for password
+    bcrypt.hash(req.body.password, saltRound, function(err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+
+        newUser.save(function(err) {
+            if (err) {
+                console.log(err);
+            } else {
+                res.render('secrets');
+            }
+        });
     });
 });
 
@@ -78,9 +87,12 @@ app.post('/login', (req, res) => {
             console.log(err);
         } else {
             if (foundUser) {
-                if (foundUser.password === password) {
-                    res.render('secrets');
-                }
+                // if (foundUser.password === password) {
+                bcrypt.compare(password, foundUser.password, function(err, result) {
+                    if (result == true) {
+                        res.render('secrets');
+                    }
+                });
             }
         }
     });
