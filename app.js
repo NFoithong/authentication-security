@@ -3,6 +3,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
+// npm i mongoose-encryption : read the document in npmjs.com to use
+const encrypt = require('mongoose-encryption');
 
 const app = express();
 
@@ -10,13 +12,25 @@ app.use(express.static('public'));
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 
+/* When strict option is set to true, 
+Mongoose will ensure that only the fields that are specified 
+in your Schema will be saved in the database, 
+and all other fields will not be saved (if some other fields are sent).
+*/
+mongoose.set("strictQuery", false);
 // connect to mongodb
 mongoose.connect('mongodb://localhost:27017/secrests', { useNewUrlParser: true });
 
-const userSchema = {
+const userSchema = new mongoose.Schema({
     email: String,
     password: String
-};
+});
+
+// Secret String Instead of Two Keys
+// For convenience, you can also pass in a single secret string instead of two keys.
+// Encrypt Only Certain Fields
+const secret = 'Thisisourlittlesecret.';
+userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
 
 const User = new mongoose.model('User', userSchema);
 
