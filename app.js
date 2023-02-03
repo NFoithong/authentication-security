@@ -19,6 +19,11 @@ const session = require('express-session');
 const passport = require('passport');
 const passportLocalMongoose = require('passport-local-mongoose');
 
+// Google-Oauth
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+const findOrCreate = require('mongoose-findorcreate');
+
 const app = express();
 
 app.use(express.static('public'));
@@ -50,11 +55,14 @@ app.use(passport.session()); // use passport to dealing with the session
 
 const userSchema = new mongoose.Schema({
     email: String,
-    password: String
+    password: String,
+    googleId: String,
 });
 
 // To use hash and salt the password to save on the mongoose DB 
 userSchema.plugin(passportLocalMongoose);
+
+userSchema.plugin(findOrCreate);
 
 // Secret String Instead of Two Keys
 // For convenience, you can also pass in a single secret string instead of two keys.
@@ -66,14 +74,54 @@ const User = new mongoose.model('User', userSchema);
 
 // passport-local configuration: serializeUser and deserializeUser
 passport.use(User.createStrategy()); // passport to use login strategy
+// this is for passport for local authentication
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+// this can work for any kind of authentication
+passport.serializeUser(function(user, done) {
+    done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+    User.findById(id, function(err, user) {
+        done(err, user);
+    });
+});
+
+// Credentials google oauth here
+passport.use(new GoogleStrategy({
+        clientID: process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        callbackURL: "http://localhost:3000/auth/google/secrets",
+        userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+            // just in case callback URL might break, this is gonna back up code as an optional
+    },
+    function(accessToken, refreshToken, profile, cb) {
+        console.log(profile);
+
+        User.findOrCreate({ googleId: profile.id }, function(err, user) {
+            return cb(err, user);
+        });
+    }
+));
 
 // home
 app.get('/', (req, res) => {
     res.render('home');
 });
+
+// request authenticate to google account for loggin
+app.get("/auth/google",
+    passport.authenticate("google", { scope: ["profile"] })
+);
+
+app.get("/auth/google/secrets",
+    passport.authenticate("google", { failureRedirect: "/login" }),
+    function(req, res) {
+        // Successful authentication, redirect secrets.
+        res.redirect("/secrets");
+    });
 
 // login page
 app.get('/login', (req, res) => {
