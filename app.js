@@ -57,6 +57,7 @@ const userSchema = new mongoose.Schema({
     email: String,
     password: String,
     googleId: String,
+    secret: String,
 });
 
 // To use hash and salt the password to save on the mongoose DB 
@@ -135,11 +136,47 @@ app.get('/register', (req, res) => {
 
 // create a secrets route
 app.get("/secrets", function(req, res) {
+    // if (req.isAuthenticated()) {
+    //     res.render("secrets");
+    // } else {
+    //     res.redirect("/login");
+    // }
+    User.find({ "secret": { $ne: null } }, function(err, foundUsers) {
+        if (err) {
+            console.log(err);
+        } else {
+            if (foundUsers) {
+                res.render("secrets", { usersWithSecrets: foundUsers });
+            }
+        }
+    });
+});
+
+app.get("/submit", function(req, res) {
     if (req.isAuthenticated()) {
-        res.render("secrets");
+        res.render("submit");
     } else {
         res.redirect("/login");
     }
+});
+
+app.post("/submit", function(req, res) {
+    const submittedSecret = req.body.secret;
+
+    console.log(req.user.id);
+
+    User.findById(req.user.id, function(err, foundUser) {
+        if (err) {
+            console.log(err);
+        } else {
+            if (foundUser) {
+                foundUser.secret = submittedSecret;
+                foundUser.save(function() {
+                    res.redirect("/secrets");
+                });
+            }
+        }
+    })
 });
 
 // logout
